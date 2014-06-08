@@ -4,7 +4,7 @@ redis-server: 127.0.0.1
 redis-port: 6379
 #Collect kill and death stats
 kill-death-stats: true
-#Collect join and leave stats
+#Collect join stats
 join-stats: true
 #Collect block break stats
 block-breaks: true
