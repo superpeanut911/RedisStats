@@ -1,0 +1,7 @@
+main: net.endercraftbuild.redis.RedisStats
+name: RedisStats
+version: 1.0
+author: superpeanut911
+commands:
+   stats:
+     description: Displays your redis stats
