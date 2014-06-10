@@ -5,8 +5,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.scheduler.BukkitRunnable;
 import redis.clients.jedis.Jedis;
 
 public class PlayerStatsListener implements Listener {
@@ -18,55 +20,96 @@ public class PlayerStatsListener implements Listener {
     }
 
     @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
+    public void onDeath(final PlayerDeathEvent event) {
 
-        if(!(plugin.getConfig().getBoolean("kill-death-stats")))
+        if (!(plugin.getConfig().getBoolean("kill-death-stats")))
             return;
 
-        Player died = event.getEntity();
+        final Player died = event.getEntity();
 
-        Jedis jedis = plugin.getJedisPool().getResource();
 
-        //Increment Player deaths by 1 - This is a Redis Hash
-        jedis.hincrBy("uuid:" + died.getUniqueId().toString(), "deaths", 1);
+        new BukkitRunnable() {
 
-        if(event.getEntity().getKiller() instanceof Player) {
-            //Increment Killer kills by 1
-            jedis.hincrBy("uuid:" + event.getEntity().getKiller().getUniqueId().toString(), "kills", 1);
-        }
+            @Override
+            public void run() {
+                Jedis jedis = plugin.getJedisPool().getResource();
+                //Increment Player deaths by 1 - This is a Redis Hash
+                jedis.hincrBy("uuid:" + died.getUniqueId().toString(), "deaths", 1);
 
-        plugin.getJedisPool().returnResource(jedis); //Return the connection to the pool
+                if (event.getEntity().getKiller() instanceof Player) {
+                    //Increment Killer kills by 1
+                    jedis.hincrBy("uuid:" + event.getEntity().getKiller().getUniqueId().toString(), "kills", 1);
+                }
 
+                plugin.getJedisPool().returnResource(jedis); //Return the connection to the pool
+            }
+
+        }.runTaskAsynchronously(plugin);
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        if(!(plugin.getConfig().getBoolean("join-stats")))
+        if (!(plugin.getConfig().getBoolean("join-stats")))
             return;
 
-        Player player = event.getPlayer();
+        final Player player = event.getPlayer();
 
-        Jedis jedis = plugin.getJedisPool().getResource();
+        new BukkitRunnable() {
 
-        jedis.hincrBy("uuid:" + player.getUniqueId().toString(), "joins", 1);
+            @Override
+            public void run() {
+                Jedis jedis = plugin.getJedisPool().getResource();
 
-        plugin.getJedisPool().returnResource(jedis); //Return to pool
+                jedis.hincrBy("uuid:" + player.getUniqueId().toString(), "joins", 1);
 
+                plugin.getJedisPool().returnResource(jedis); //Return to pool
+            }
+
+        }.runTaskAsynchronously(plugin);
     }
+
     @EventHandler
     public void onBlockBreak(BlockBreakEvent event) {
 
-        if(!(plugin.getConfig().getBoolean("block-breaks")))
+        if (!(plugin.getConfig().getBoolean("block-breaks")))
             return;
 
-        Player player = event.getPlayer();
+        final Player player = event.getPlayer();
 
-        Jedis jedis = plugin.getJedisPool().getResource();
-        //This will get called a lot... Redis can handle a lot :)
-        jedis.hincrBy("uuid:" + player.getUniqueId().toString(), "block-breaks", 1);
+        new BukkitRunnable() {
 
-        plugin.getJedisPool().returnResource(jedis);
+            @Override
+            public void run() {
+                Jedis jedis = plugin.getJedisPool().getResource();
+                //This will get called a lot... Redis can handle a lot :)
+                jedis.hincrBy("uuid:" + player.getUniqueId().toString(), "block-breaks", 1);
 
+                plugin.getJedisPool().returnResource(jedis);
+            }
+
+        }.runTaskAsynchronously(plugin);
+    }
+
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent event) {
+
+        if (!(plugin.getConfig().getBoolean("blocks-placed")))
+            return;
+
+        final Player player = event.getPlayer();
+
+        new BukkitRunnable() {
+
+            @Override
+            public void run() {
+                Jedis jedis = plugin.getJedisPool().getResource();
+                //This will get called a lot... Redis can handle a lot :)
+                jedis.hincrBy("uuid:" + player.getUniqueId().toString(), "blocks-placed", 1);
+
+                plugin.getJedisPool().returnResource(jedis);
+            }
+
+        }.runTaskAsynchronously(plugin);
     }
 
 }

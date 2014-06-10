@@ -8,3 +8,5 @@ kill-death-stats: true
 join-stats: true
 #Collect block break stats
 block-breaks: true
+#Collect blocks placed stats
+blocks-placed: true

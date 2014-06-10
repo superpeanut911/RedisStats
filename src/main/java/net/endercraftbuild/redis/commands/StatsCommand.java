@@ -6,6 +6,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Response;
@@ -17,7 +18,9 @@ public class StatsCommand implements CommandExecutor {
     public StatsCommand(RedisStats plugin) {
         this.plugin = plugin;
     }
+
     // /stats
+
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (!(sender instanceof Player)) {
@@ -25,60 +28,74 @@ public class StatsCommand implements CommandExecutor {
             return true;
         }
 
-        Player player = (Player)sender;
+        final Player player = (Player)sender;
 
         player.sendMessage(ChatColor.RED + "===========" + ChatColor.GOLD + " Stats " + ChatColor.RED + "===========");
 
-        //Kills + Deaths
-        if(plugin.getConfig().getBoolean("kill-death-stats")) {
+        new BukkitRunnable() {
 
-            Jedis jedisKD = plugin.getJedisPool().getResource();
+            @Override
+            public void run() {
+                Jedis jedis = plugin.getJedisPool().getResource();
+                Pipeline pipeline = jedis.pipelined();
 
-            //Pipeline Example. It won't see much performance difference with only 2 requests but with many requests it can
-            Pipeline pipelineKD = jedisKD.pipelined();
+                Response<String> killsResponse = pipeline.hget("uuid:" + player.getUniqueId().toString(), "kills");
+                Response<String> deathsResponse = pipeline.hget("uuid:" + player.getUniqueId().toString(), "deaths");
+                Response<String> joinsResponse = pipeline.hget("uuid:" + player.getUniqueId().toString(), "joins");
+                Response<String> breaksResponse =  pipeline.hget("uuid:" + player.getUniqueId().toString(), "block-breaks");
+                Response<String> placedResponse = pipeline.hget("uuid:" + player.getUniqueId().toString(), "blocks-placed");
 
-            Response<String> killsResonse = pipelineKD.hget("uuid:" + player.getUniqueId().toString(), "kills");
-            Response<String> deathsResponse = pipelineKD.hget("uuid:" + player.getUniqueId().toString(), "deaths");
+                pipeline.sync(); //You need to read & close the pipeline before accessing the data below...
 
-            pipelineKD.sync(); //You need to read & close the pipeline before accessing the data below...
+                String kills = killsResponse.get(); //Access data after pipeline is closed
+                String deaths = deathsResponse.get();
+                String joins = joinsResponse.get();
+                String breaks = breaksResponse.get();
+                String placed = placedResponse.get();
 
-            String kills = killsResonse.get(); //Access data after pipeline is closed
-            String deaths = deathsResponse.get();
+                //All Done with jedis, will just display stats in chat async
+                plugin.getJedisPool().returnResource(jedis);
 
-            player.sendMessage(ChatColor.GOLD + "Kills: " + ChatColor.YELLOW + kills);
-            player.sendMessage(ChatColor.GOLD + "Deaths: " + ChatColor.YELLOW + deaths);
+                //Kills + Deaths
+                if(plugin.getConfig().getBoolean("kill-death-stats")) {
 
-            if(kills != null && deaths != null) {
-                player.sendMessage(ChatColor.GOLD + "K/D Ratio: " + ChatColor.YELLOW + Double.valueOf(kills) / Double.valueOf(deaths));
+
+                    player.sendMessage(ChatColor.GOLD + "Kills: " + ChatColor.YELLOW + kills);
+                    player.sendMessage(ChatColor.GOLD + "Deaths: " + ChatColor.YELLOW + deaths);
+
+                    if(kills != null && deaths != null) {
+                        player.sendMessage(ChatColor.GOLD + "K/D Ratio: " + ChatColor.YELLOW + Double.valueOf(kills) / Double.valueOf(deaths));
+                    }
+
+
+                }
+                //Joins
+                if(plugin.getConfig().getBoolean("join-stats")) {
+
+                    player.sendMessage(ChatColor.GOLD + "Server Joins: " + ChatColor.YELLOW + joins);
+
+                }
+
+                //Block breaks
+                if(plugin.getConfig().getBoolean("block-breaks")) {
+
+                    player.sendMessage(ChatColor.GOLD + "Blocks broken: " + ChatColor.YELLOW + breaks);
+
+                }
+
+                //Blocks placed
+                if(plugin.getConfig().getBoolean("blocks-placed")) {
+
+                    player.sendMessage(ChatColor.GOLD + "Blocks placed: " + ChatColor.YELLOW + placed);
+
+                }
+
+                player.sendMessage(ChatColor.RED + "============================");
             }
 
-            plugin.getJedisPool().returnResource(jedisKD); //Return to pool
-        }
-        //Joins
-        if(plugin.getConfig().getBoolean("join-stats")) {
-            //Only 1 request, no need to pipeline this
-            Jedis jedisJ = plugin.getJedisPool().getResource();
+        }.runTaskAsynchronously(plugin);
 
-            String joins= jedisJ.hget("uuid:" + player.getUniqueId().toString(), "joins");
 
-            player.sendMessage(ChatColor.GOLD + "Server Joins: " + ChatColor.YELLOW + joins);
-
-            plugin.getJedisPool().returnResource(jedisJ); //Massive mem leak if you dont do this
-
-        }
-        //Block breaks
-        if(plugin.getConfig().getBoolean("block-breaks")) {
-            Jedis jedisB = plugin.getJedisPool().getResource();
-
-            String breaks = jedisB.hget("uuid:" + player.getUniqueId().toString(), "block-breaks");
-
-            player.sendMessage(ChatColor.GOLD + "Blocks broken: " + ChatColor.YELLOW + breaks);
-
-            plugin.getJedisPool().returnResource(jedisB);
-
-        }
-
-        player.sendMessage(ChatColor.RED + "============================");
         return true;
 
     }

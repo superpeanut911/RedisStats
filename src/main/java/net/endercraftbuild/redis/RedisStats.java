@@ -16,8 +16,12 @@ public class RedisStats extends JavaPlugin {
     public void onEnable() {
 
         File configFile = new File(getDataFolder() + "/config.yml");
-        if (!configFile.exists())
+
+        if (!configFile.exists()) {
             this.saveDefaultConfig();
+        }
+        this.getConfig().options().copyDefaults(true);
+
         try {
             pool = new JedisPool(new JedisPoolConfig(), this.getConfig().getString("redis-server"), this.getConfig().getInt("redis-port"));
 

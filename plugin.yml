@@ -1,6 +1,6 @@
 main: net.endercraftbuild.redis.RedisStats
 name: RedisStats
-version: 1.0
+version: 1.1
 author: superpeanut911
 commands:
    stats:
