@@ -11,6 +11,8 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Response;
 
+import java.util.logging.Level;
+
 public class StatsCommand implements CommandExecutor {
 
     private RedisStats plugin;
@@ -36,14 +38,25 @@ public class StatsCommand implements CommandExecutor {
 
             @Override
             public void run() {
+
+
                 Jedis jedis = plugin.getJedisPool().getResource();
                 Pipeline pipeline = jedis.pipelined();
+
+                Long startedTime = System.currentTimeMillis(); //Lets see how fast this is
 
                 Response<String> killsResponse = pipeline.hget("uuid:" + player.getUniqueId().toString(), "kills");
                 Response<String> deathsResponse = pipeline.hget("uuid:" + player.getUniqueId().toString(), "deaths");
                 Response<String> joinsResponse = pipeline.hget("uuid:" + player.getUniqueId().toString(), "joins");
                 Response<String> breaksResponse =  pipeline.hget("uuid:" + player.getUniqueId().toString(), "block-breaks");
                 Response<String> placedResponse = pipeline.hget("uuid:" + player.getUniqueId().toString(), "blocks-placed");
+                //Global stats
+                Response<String> globalKillsRes = pipeline.hget("global", "kills");
+                Response<String> globalJoinsRes = pipeline.hget("global", "joins");
+                Response<String> globalDeathsRes = pipeline.hget("global", "deaths");
+                Response<String> globalBlocksPlacedRes = pipeline.hget("global" , "blocks-placed");
+                Response<String> globalBlocksBrokeRes = pipeline.hget("global", "block-breaks");
+                Response<String> globalPlayRes = pipeline.hget("global", "time-played");
 
                 pipeline.sync(); //You need to read & close the pipeline before accessing the data below...
 
@@ -52,9 +65,19 @@ public class StatsCommand implements CommandExecutor {
                 String joins = joinsResponse.get();
                 String breaks = breaksResponse.get();
                 String placed = placedResponse.get();
+                String globalKills = globalKillsRes.get();
+                String globalDeaths = globalDeathsRes.get();
+                String globalJoins = globalJoinsRes.get();
+                String globalBlocksPlaced = globalBlocksPlacedRes.get();
+                String globalBlocksBroke = globalBlocksBrokeRes.get();
+                String globalPlayTime = globalPlayRes.get();
 
                 //All Done with jedis, will just display stats in chat async
                 plugin.getJedisPool().returnResource(jedis);
+
+                Long endedTime = System.currentTimeMillis();
+
+                plugin.getServer().getLogger().log(Level.INFO, "[RedisStats] Got stats (" + player.getName() + ") in " + (endedTime - startedTime) + " milliseconds");
 
                 //Kills + Deaths
                 if(plugin.getConfig().getBoolean("kill-death-stats")) {
@@ -89,7 +112,16 @@ public class StatsCommand implements CommandExecutor {
                     player.sendMessage(ChatColor.GOLD + "Blocks placed: " + ChatColor.YELLOW + placed);
 
                 }
-
+                player.sendMessage(ChatColor.RED + "========" + ChatColor.YELLOW + " Global Stats " + ChatColor.RED + "========");
+                String time = plugin.convertMillisToDays(Long.valueOf(globalPlayTime)) + " days"; //Format to days
+                player.sendMessage(ChatColor.GOLD + "Time played: " + ChatColor.YELLOW + time);
+                player.sendMessage(ChatColor.GOLD + "Global Kills: " + ChatColor.YELLOW + globalKills);
+                player.sendMessage(ChatColor.GOLD + "Global Deaths: " + ChatColor.YELLOW + globalDeaths);
+                player.sendMessage(ChatColor.GOLD + "Global K/D: " + ChatColor.YELLOW + Double.valueOf(globalKills) / Double.valueOf(globalDeaths));
+                player.sendMessage(ChatColor.GOLD + "Global Joins: " + ChatColor.YELLOW + globalJoins );
+                player.sendMessage(ChatColor.GOLD + "Global Blocks Broken: " + ChatColor.YELLOW + globalBlocksBroke);
+                player.sendMessage(ChatColor.GOLD + "Global Blocks Placed: " + ChatColor.YELLOW + globalBlocksPlaced);
+                player.sendMessage(ChatColor.DARK_GRAY + ChatColor.ITALIC.toString() + "Got all data in: " + (endedTime - startedTime) + "ms"); //Easily keep track
                 player.sendMessage(ChatColor.RED + "============================");
             }
 

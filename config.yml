@@ -10,3 +10,5 @@ join-stats: true
 block-breaks: true
 #Collect blocks placed stats
 blocks-placed: true
+#Global play time
+time-played: true

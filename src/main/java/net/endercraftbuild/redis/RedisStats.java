@@ -49,4 +49,14 @@ public class RedisStats extends JavaPlugin {
     public JedisPool getJedisPool() {
         return pool;
     }
+
+    public float convertMillisToMinutes(Long l) {
+        return (l / 1000) / 60;
+    }
+    public float convertMillisToHours(Long l) {
+        return convertMillisToMinutes(l) / 60;
+    }
+    public float convertMillisToDays(Long l) {
+        return convertMillisToHours(l) / 24;
+    }
 }
